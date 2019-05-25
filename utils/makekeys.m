@@ -8,9 +8,8 @@ keysout = [];
 for i = 1:numoct
     keysout = [keysout keys+(i-1)*12];
 end
-keybuff = 64-max(keysout);
-keysout = keysout+12*floor(keybuff/24)+addoct*12+25;
-if max(keysout) > 64+25 
+keysout = keysout+addoct*12+1;
+if max(keysout) > 52 % current note range, from C0 to D#4.
     out = 0; 
     return
 else

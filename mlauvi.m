@@ -10,21 +10,25 @@ if nargin && ischar(varargin{1}); gui_State.gui_Callback = str2func(varargin{1})
 if nargout; [varargout{1:nargout}] = gui_mainfcn(gui_State, varargin{:}); else; gui_mainfcn(gui_State, varargin{:}); end
 
 function mlauvi_OpeningFcn(hO, ~, h, varargin)
+
+% Addpath GUI folder
+if ~contains(path,'mlauvi')
+    addpath(genpath(uigetdir(cd,'Please navigate to the mlauvi directory.')));
+end
+
+
 % set ffmpeg path (for combining V/A)
 try
-    setenv('PATH', cell2mat(importdata('ffmpegpath.txt')));
+    setenv('PATH', cell2mat(importdata('ffmpegpath.txt')))
     h.St.String = 'ffmpeg path set. Ready to load a dataset';
 catch
     h.St.String = 'No ffmpeg path found in ffmpegpath.txt. Please update this file to add audio and video seamlessly.';
 end
 
-pathtogui = 
-
 % Set up load pct multi slider
 h.output = hO; h.framenum = 1; set(gcf, 'units','normalized','outerposition',[.2 .2 .85 .75]);
 h.slider = superSlider(hO, 'numSlides', 2,'controlColor',[.94 .94 .94],... 
-'position',[.14 .563 .1 .03],'stepSize',.3,... 
-'callback',@slider_Callback);
+'position',[.14 .563 .1 .03],'stepSize',.3,'callback',@slider_Callback);
 h.slider.UserData = [0 1;0 1];
 h.slider.Children(2).Position(1) = .8125;
 guidata(hO, h);
@@ -64,19 +68,22 @@ h.cmap = jet(size(h.H,1));
 h.m.existneuralstream = 0;
 h.m.vstart = 0;
 h.m.vend = 1;
-h.m.keys = makekeys(h.scale.Value,h.scaletype.Value,numel(find(h.m.W_sf)),str2num(h.addoct.String));
+%h.m.keys = makekeys(h.scale.Value,h.scaletype.Value,numel(find(h.m.W_sf)),str2num(h.addoct.String));
 h = assessFields(h);
 UpdatePlots(h)
 guidata(hO, h);
 
-function ExportMIDI_Callback(hO, ~, h)
-h.St.String = 'Writing MIDI file...'; drawnow
-midiout = matrix2midi_nic(h.Mfinal,300,[4,2,24,8],0);
-h.St.String = 'MIDI file written.';
-writemidi(midiout, h.filename.String);
+function ExportDynAud_Callback(hO, ~, h)
+h.St.String = 'Writing DynAud file...'; drawnow
+%midiout = matrix2midi_nic(h.Mfinal,300,[4,2,24,8],0);
+%writemidi(midiout, h.filename.String);
 if ~isempty(h.nd)
-    nd_to_wav(h.filename.String,h.nd);
+    nd_to_wav(h.filename.String,h.nd,h);
 end
+h.St.String = 'DynAud file written.';
+h.combineAV.Enable = 'on';
+guidata(hO,h)
+
 
 function ExportAVI_Callback(hO, ~, h)
 h.St.String = 'Writing AVI file...'; drawnow
@@ -109,13 +116,13 @@ if strcmp(h.Wshow.String,'all')
 else
     h.m.Wshow = str2num(h.Wshow.String);
 end
-h.MIDIdiscrete.BackgroundColor = [1 0 0];
+h.UpdateH.BackgroundColor = [1 0 0];
 UpdatePlots(h)
 guidata(hO, h);
 
 function framerate_Callback(hO, ~, h)
 h.m.framerate = str2num(h.framerate.String);
-h.MIDIdiscrete.BackgroundColor = [1 0 0];
+h.UpdateH.BackgroundColor = [1 0 0];
 h = assessFields(h);
 guidata(hO, h);
 
@@ -127,7 +134,7 @@ guidata(hO, h);
 function thresh_Callback(hO, ~, h)
 h.m.thresh = str2num(h.thresh.String);
 h = assessFields(h);
-h.MIDIdiscrete.BackgroundColor = [1 0 0];
+h.UpdateH.BackgroundColor = [1 0 0];
 guidata(hO, h);
 
 function frameslider_Callback(hO, ~, h)
@@ -137,8 +144,8 @@ UpdatePlots(h)
 guidata(hO, h);
 
 function PlayVid_Callback(hO, ~, h)
-axes(h.axesWH);
 while h.PlayVid.Value
+    axes(h.axesWH);
     h.frameslider.Enable = 'off';
     sc = 256/h.m.clim(2);
     im = reshape(h.W(:,h.m.Wshow)*diag(h.H(h.m.Wshow,h.framenum).*h.m.W_sf(h.m.Wshow)'-h.m.clim(1))*h.cmap(h.m.Wshow,:),[h.m.ss(1:2) 3]);
@@ -150,6 +157,8 @@ while h.PlayVid.Value
     h.frametxt.String = [mat2str(round(h.framenum*100/h.m.framerate)/100) ' sec'];
     h.framenum = h.framenum + 1;
     h.frameslider.Value = h.framenum/size(h.H,2);
+    axes(h.axesWH);
+
     if ~get(h.PlayVid, 'Value')
         break;
     end
@@ -162,27 +171,27 @@ h.frameslider.Enable = 'on';
 guidata(hO, h);
 
 
-function MIDIdiscrete_Callback(hO, ~, h)
+function UpdateH_Callback(hO, ~, h)
 outinds = round(h.m.vstart*size(h.H,2))+1:round(h.m.vend*size(h.H,2));
 tmp = zeros(1,size(h.H,1)); tmp(h.m.Wshow) = 1;
 
 h.St.String = 'Updating H''...'; drawnow
-[h.m.keys,out] = makekeys(h.scale.Value,h.scaletype.Value,numel(find(h.m.W_sf & tmp)),str2num(h.addoct.String));
-if ~out
+[h.m.keys,keyrangegood] = makekeys(h.scale.Value,h.scaletype.Value,numel(find(h.m.W_sf & tmp)),str2num(h.addoct.String));
+if ~keyrangegood
     h.St.String = 'ERROR: The number of components and note arrangement you have chosen is too broad. Please try using less components or a tighter note arrangement (e.g. scale)';
     return
 end
 
 %h.Mfinal = H_to_MIDI(h.H(find(h.m.W_sf & tmp),outinds),h.m.framerate,h.m.thresh,h.m.keys);
 
-[h.Mfinal,h.nd] = H_to_WAV(h.H(find(h.m.W_sf & tmp),outinds),h.m.framerate,h.m.thresh,h.m.keys);
+[h.Mfinal,h.nd] = H_to_nd(h.H(find(h.m.W_sf & tmp),outinds),h.m.framerate,h.m.thresh,h.m.keys);
 h.M.notestart = h.Mfinal(:,5);
 h.M.noteend = h.Mfinal(:,6);
 h.M.notemag = h.Mfinal(:,4);
 h.M.notekey = h.Mfinal(:,3);
 
 guidata(hO, h);
-h.MIDIdiscrete.BackgroundColor = [.94 .94 .94];
+h.UpdateH.BackgroundColor = [.94 .94 .94];
 UpdatePlots(h)
 h.St.String = 'H'' updated.';
 
@@ -210,10 +219,10 @@ else
     h.bs = 'off';
 end
 
-set(h.ExportMIDI,'enable',h.bs)
+set(h.ExportDynAud,'enable',h.bs)
 set(h.ExportAVI,'enable',h.bs)
 set(h.ExportStream,'enable',h.bs)
-set(h.MIDIdiscrete,'enable',h.bs)
+set(h.UpdateH,'enable',h.bs)
 set(h.Wshow,'enable',h.bs)
 set(h.frameslider,'enable',h.bs)
 UpdatePlots(h)
@@ -225,7 +234,7 @@ else
     h.m.W_sf = ones(1,size(h.W,2));
 end
 UpdatePlots(h)
-h.MIDIdiscrete.BackgroundColor = [1 0 0];
+h.UpdateH.BackgroundColor = [1 0 0];
 guidata(hO, h);
 
 function ExportStream_Callback(hO, ~, h)

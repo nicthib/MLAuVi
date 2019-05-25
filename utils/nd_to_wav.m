@@ -1,9 +1,9 @@
-function nd_to_wav(filename,nd)
+function nd_to_wav(filename,nd,h)
 % nd should contain an array with columns in this order:
 % ns (note start), ne (note end), k (note value), v (velocity)
 
 r = .25;
-nd(:,3) = nd(:,3) - 24;
+nd(:,3) = nd(:,3);
 
 % Initialize audio track
 fs = 44100;
@@ -21,7 +21,6 @@ for i = 1:size(nd,1)
     if currnote ~= nd(i,3)
         [note,ps] = notestr(nd(i,3)+1); % add 1 since C starts at 1 for these files. (C starts at 0 for MIDI)
         raw = loadnote(note,ps);
-        disp('New note!')
     end
     l = nd(i,2) - nd(i,1);
     if l <= .08
@@ -62,6 +61,10 @@ for i = 1:size(nd,1)
     wavidx = round(nd(i,1)*fs)+1:round(nd(i,1)*fs)+size(tmpnote,1);
     wav(wavidx,:) = wav(wavidx,:) + tmpnote;
     currnote = nd(i,3);
+    h.St.String = ['Writing DynAud file... ' mat2str(round(i*100/size(nd,1))) ' % done'];
+    drawnow
 end
+wav = wav-min(wav(:));
+wav = wav*2/max(wav(:))-1;
 
 audiowrite([filename '.wav'],wav(1:round(fs*max(nd(:,2))),:)/max(wav(:)),fs);

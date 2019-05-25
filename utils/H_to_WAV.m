@@ -1,4 +1,4 @@
-function [Mfinal,nd] = H_to_WAV(H,fr,thr,keys)
+function [Mfinal,nd] = H_to_nd(H,fr,thr,keys)
 MIDImat = []; %MIDImat is for MIDI files
 nd = []; % ND is for WAV files
 us_f = 100;
