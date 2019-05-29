@@ -10,12 +10,12 @@ if nargin && ischar(varargin{1}); gui_State.gui_Callback = str2func(varargin{1})
 if nargout; [varargout{1:nargout}] = gui_mainfcn(gui_State, varargin{:}); else; gui_mainfcn(gui_State, varargin{:}); end
 
 function mlauvi_OpeningFcn(hO, ~, h, varargin)
-
+warning('off','all')
 % Addpath GUI folder
-if ~contains(path,'mlauvi')
+if ~contains(path,{'mlauvi/utils','mlauvi/audio'})
+    waitfor(msgbox('Please choose the mlauvi folder.'));
     addpath(genpath(uigetdir(cd,'Please navigate to the mlauvi directory.')));
 end
-
 
 % set ffmpeg path (for combining V/A)
 try
@@ -38,52 +38,54 @@ varargout{1} = h.output;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+function Loadcfg_Callback(hO,~,h)
+[File,Path] = uigetfile('.mat','Please choose a cfg file');
+close all
+load(fullfile(Path,File))
+guidata(hO, h);
+
 function LoadData_Callback(hO, ~, h)
-[File,Path] = uigetfile('.mat','Please choose a data file');
-load(fullfile(Path, File));
-h.filename.String = strrep(File,'.mat',''); h.filenametext.String = h.filename.String;
-ReqVars = {'H','W','im'};
-for i = 1:numel(ReqVars)
-    if exist('H') && exist ('W') && exist('m')
-        h.H = H; h.W = W; h.m = m;
-        h.m.ss = size(h.W);
-        if numel(h.m.ss) ~= 3
-            errordlg('Error: W is not 3D. Please make sure that W is a 3D matrix of N 2D images.')
-            return
-        else
-            h.W = reshape(h.W,[prod(h.m.ss(1:2)) h.m.ss(3)]);
-            h.St.String = 'Dataset loaded successfully';
-        end
-    else
-        errordlg('Error loading file. Please make sure that the .mat file contains the following variables: H, W, m')
-        return
+[File,Path] = uigetfile('.mat','Please choose a data file that contains H');
+matObj = matfile(fullfile(Path, File));
+matvars = whos(matObj);
+answer = questdlg('Would you like to load H?');
+if answer == 'Yes'
+    for i = 1:numel([matvars.name])
+        varstr{i} = ['Name = ' matvars(i).name ', size = ' mat2str(matvars(i).size)];
     end
+    varH = listdlg('ListString',varstr,'Name','Choose H');
+    h.H = matObj.(matvars(varH).name);
+    h.cmap = jet(size(h.H,1));
+    h.UpdateH = eF(h.UpdateH);
+    h.ExportAudio = eF(h.ExportAudio);
 end
 
+answer = questdlg('Would you like to load W?');
+if answer == 'Yes'
+    for i = 1:numel([matvars.name])
+        varstr{i} = ['Name = ' matvars(i).name ', size = ' mat2str(matvars(i).size)];
+    end
+    varW = listdlg('ListString',varstr,'Name','Choose H');
+    h.W = matObj.(matvars(varW).name);
+    h.m.Wshow = 1:size(h.H,1);
+    h.m.W_sf = ones(1,size(h.W,3));
+    h.m.ss = size(h.W);
+    h.W = reshape(h.W,[prod(h.m.ss(1:2)) h.m.ss(3)]);
+    h.ExportAVI = eF(h.ExportAVI);
+end
 % set default values
-h.m.Wshow = 1:size(h.H,1);
-h.m.W_sf = ones(1,size(h.W,2));
+
 h.m.clim = str2num(h.clim.String);
-h.cmap = jet(size(h.H,1));
 h.m.existneuralstream = 0;
 h.m.vstart = 0;
 h.m.vend = 1;
-%h.m.keys = makekeys(h.scale.Value,h.scaletype.Value,numel(find(h.m.W_sf)),str2num(h.addoct.String));
-h = assessFields(h);
+h.m.framerate = str2num(h.framerate.String);
+h.m.thresh = str2num(h.thresh.String);
+h.filename.String = File(1:end-4);
+h.filenametext.String = File(1:end-4);
 UpdatePlots(h)
+h.Savecfg = eF(h.Savecfg);
 guidata(hO, h);
-
-function ExportDynAud_Callback(hO, ~, h)
-h.St.String = 'Writing DynAud file...'; drawnow
-%midiout = matrix2midi_nic(h.Mfinal,300,[4,2,24,8],0);
-%writemidi(midiout, h.filename.String);
-if ~isempty(h.nd)
-    nd_to_wav(h.filename.String,h.nd,h);
-end
-h.St.String = 'DynAud file written.';
-h.combineAV.Enable = 'on';
-guidata(hO,h)
-
 
 function ExportAVI_Callback(hO, ~, h)
 h.St.String = 'Writing AVI file...'; drawnow
@@ -109,7 +111,6 @@ end
 h.St.String = 'AVI file written';
 close(vidObj);
 
-
 function Wshow_Callback(hO, ~, h)
 if strcmp(h.Wshow.String,'all')
     h.m.Wshow = 1:size(h.H,1);
@@ -123,7 +124,6 @@ guidata(hO, h);
 function framerate_Callback(hO, ~, h)
 h.m.framerate = str2num(h.framerate.String);
 h.UpdateH.BackgroundColor = [1 0 0];
-h = assessFields(h);
 guidata(hO, h);
 
 function clim_Callback(hO, ~, h)
@@ -133,7 +133,6 @@ guidata(hO, h);
 
 function thresh_Callback(hO, ~, h)
 h.m.thresh = str2num(h.thresh.String);
-h = assessFields(h);
 h.UpdateH.BackgroundColor = [1 0 0];
 guidata(hO, h);
 
@@ -170,7 +169,6 @@ end
 h.frameslider.Enable = 'on';
 guidata(hO, h);
 
-
 function UpdateH_Callback(hO, ~, h)
 outinds = round(h.m.vstart*size(h.H,2))+1:round(h.m.vend*size(h.H,2));
 tmp = zeros(1,size(h.H,1)); tmp(h.m.Wshow) = 1;
@@ -195,38 +193,6 @@ h.UpdateH.BackgroundColor = [.94 .94 .94];
 UpdatePlots(h)
 h.St.String = 'H'' updated.';
 
-function h = assessFields(h)
-fields = {'framerate','clim','thresh'};
-fieldsgood = zeros(size(fields));
-for i = 1:numel(fields)
-    if isfield(h.m,fields{i})
-        h.(fields{i}).String = mat2str(h.m.(fields{i}));
-        h.(fields{i}).BackgroundColor = [.94 .94 .94];
-        fieldsgood(i) = 1;
-    elseif ~isempty(h.(fields{i}).String)
-        h.m.(fields{i}) = str2num(h.(fields{i}).String);
-        h.(fields{i}).BackgroundColor = [.94 .94 .94];
-        fieldsgood(i) = 1;
-    else
-        h.(fields{i}).BackgroundColor = [1 .3 .3];
-        fieldsgood(i) = 0;
-    end
-end
-
-if sum(fieldsgood) == numel(fieldsgood)
-    h.bs = 'on';
-else
-    h.bs = 'off';
-end
-
-set(h.ExportDynAud,'enable',h.bs)
-set(h.ExportAVI,'enable',h.bs)
-set(h.ExportStream,'enable',h.bs)
-set(h.UpdateH,'enable',h.bs)
-set(h.Wshow,'enable',h.bs)
-set(h.frameslider,'enable',h.bs)
-UpdatePlots(h)
-
 function W_sf_Callback(hO, ~, h)
 if h.W_sf.Value
     h.m.W_sf = imbinarize(sum(h.W,1)/max(sum(h.W,1)),.1);
@@ -235,20 +201,6 @@ else
 end
 UpdatePlots(h)
 h.UpdateH.BackgroundColor = [1 0 0];
-guidata(hO, h);
-
-function ExportStream_Callback(hO, ~, h)
-h.St.String = 'Writing audio stream...'; drawnow
-outinds = round(h.m.vstart*size(h.H,2))+1:round(h.m.vend*size(h.H,2));
-tmp = zeros(1,size(h.H,1)); tmp(h.m.Wshow) = 1;
-out = NeuralStream(h.H(h.m.W_sf & tmp,outinds),h.m,h.m.keys,h.filename.String);
-if ~out
-    h.St.String = 'ERROR: The number of components and note arrangement you have chosen is too broad. Please try using less components or a tighter note arrangement (e.g. scale)';
-    return
-end
-h.m.existneuralstream = 1;
-h.combineAV.Enable = 'on';
-h.St.String = 'Audio stream written.';
 guidata(hO, h);
 
 function editcmap_Callback(hO, ~, h)
@@ -274,6 +226,34 @@ h.m.vend = str2num(h.ve_str.String)/100;
 h.slider.Children(2).Position(1) = h.m.vend * .625 + .1875;
 guidata(hO,h);
 
+function ExportAudio_Callback(hO, ~, h)
+switch h.AudioFormat.Value
+    case 1 % Stream
+        h.St.String = 'Writing Audio stream...';
+        outinds = round(h.m.vstart*size(h.H,2))+1:round(h.m.vend*size(h.H,2));
+        tmp = zeros(1,size(h.H,1)); tmp(h.m.Wshow) = 1;
+        out = NeuralStream(h.H(h.m.W_sf & tmp,outinds),h.m,h.m.keys,h.filename.String);
+        if ~out
+            h.St.String = 'ERROR: The number of components and note arrangement you have chosen is too broad. Please try using less components or a tighter note arrangement (e.g. scale)';
+            return
+        end
+        h.St.String = 'Audio stream written...';
+    case 2 % Dynamic
+        h.St.String = 'Writing Dynamic Audio file...';
+        if ~isempty(h.nd)
+            nd_to_wav(h.filename.String,h.nd,h);
+        end
+        h.St.String = 'Dynamic Audio file written.'; drawnow
+    case 3 % MIDI
+        h.St.String = 'Writing MIDI...';
+        midiout = matrix2midi_nic(h.Mfinal,300,[4,2,24,8],0);
+        writemidi(midiout, h.filename.String);
+        h.St.String = 'MIDI file written'; drawnow
+end
+
+h.combineAV.Enable = 'on';
+guidata(hO,h)
+
 function combineAV_Callback(hO, ~, h)
 fn = h.filename.String; 
 
@@ -284,11 +264,22 @@ else
     h.St.String = 'AVI w/ audio was unable to be written. Check to make sure you have the proper path to ffmpeg.exe in the ffmpegpath.txt file.';
 end
 
+function Savecfg_Callback(hO,~,h)
+save([h.filename.String '_cfg.mat'])
+h.St.String = ['Config file saved as ' h.filename.String '_cfg.mat.'];
+
 function targ = vF(targ) % visibility toggle
-if targ.Visible == 'on'
+if strcmp(targ.Visible,'on')
     targ.Visible = 'off';
 else
     targ.Visible = 'on';
+end
+
+function targ = eF(targ) % enable toggle
+if strcmp(targ.Enable,'on')
+    targ.Enable = 'off';
+else
+    targ.Enable = 'on';
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -308,3 +299,8 @@ function addoct_Callback(hO, ~, h)
 function addoct_CreateFcn(hO, ~, h)
 function ve_str_CreateFcn(hO, ~, h)
 function vs_str_CreateFcn(hO, ~, h)
+function AudioFormat_Callback(hObject, eventdata, handles)
+function AudioFormat_CreateFcn(hObject, eventdata, handles)
+
+
+

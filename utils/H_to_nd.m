@@ -28,7 +28,7 @@ for i = 1:size(H,1)
         end
         MIDItmp = [notekey;notemag;notestart;noteend];
         MIDImat = [MIDImat MIDItmp];
-        nd = [nd;[notestart'/(us_f*fr) noteend'/(us_f*fr) notekey' round(notemag*127)']];
+        nd = [nd;[notestart'/(us_f*fr) noteend'/(us_f*fr) notekey' round(notemag*127/max(notemag))']];
         tmp = zeros(size(TC)); tmp(tmp == 0) = NaN;
     end
 end

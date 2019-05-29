@@ -15,7 +15,7 @@ nd = sortrows(nd,3);
 
 notes = unique(nd(:,3));
 
-currnote = 0;
+currnote = -1;
 for i = 1:size(nd,1)
     % Check if we need to load a new note
     if currnote ~= nd(i,3)
