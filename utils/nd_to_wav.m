@@ -20,7 +20,7 @@ for i = 1:size(nd,1)
     % Check if we need to load a new note
     if currnote ~= nd(i,3)
         [note,ps] = notestr(nd(i,3)+1); % add 1 since C starts at 1 for these files. (C starts at 0 for MIDI)
-        raw = loadnote(note,ps);
+        raw = loadnote(note,ps,1);
     end
     l = nd(i,2) - nd(i,1);
     if l <= .08

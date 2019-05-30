@@ -65,6 +65,7 @@ if answer == 'Yes'
     h.m.ss = size(h.W);
     h.W = reshape(h.W,[prod(h.m.ss(1:2)) h.m.ss(3)]);
     h.W_sf.Checked = 'off';
+    h.frameslider.Enable = 'on';
 end
 
 h.m.clim = str2num(h.clim.String);
@@ -104,14 +105,14 @@ guidata(hO, h);
 
 function thresh_Callback(hO, ~, h)
 h.m.thresh = str2num(h.thresh.String);
-UpdateH_Callback(hO, h)
+UpdateH_Callback(hO, [], h)
 guidata(hO, h);
 
 function frameslider_Callback(hO, ~, h)
 h.framenum = round(h.frameslider.Value*size(h.H,2));
 h.frametxt.String = [mat2str(round(h.framenum*100/h.m.framerate)/100) ' sec'];
 UpdatePlots(h)
-UpdateH_Callback(hO, h)
+UpdateH_Callback(hO, [], h)
 guidata(hO, h);
 
 function PlayVid_Callback(hO, ~, h)
@@ -141,7 +142,7 @@ end
 h.frameslider.Enable = 'on';
 guidata(hO, h);
 
-function UpdateH_Callback(hO, h)
+function UpdateH_Callback(hO, ~, h)
 outinds = round(h.m.vstart*size(h.H,2))+1:round(h.m.vend*size(h.H,2));
 tmp = zeros(1,size(h.H,1)); tmp(h.m.Wshow) = 1;
 
@@ -190,17 +191,17 @@ guidata(hO,h);
 function vs_str_Callback(hO, ~, h)
 h.m.vstart = str2num(h.vs_str.String)/100;
 h.slider.Children(1).Position(1) = h.m.vstart * .625;
-UpdateH_Callback(hO, h)
+UpdateH_Callback(hO, [], h)
 guidata(hO,h);
 
 function ve_str_Callback(hO, ~, h)
 h.m.vend = str2num(h.ve_str.String)/100;
 h.slider.Children(2).Position(1) = h.m.vend * .625 + .1875;
-UpdateH_Callback(hO, h)
+UpdateH_Callback(hO, [], h)
 guidata(hO,h);
 
 function ExportAudio_Callback(hO, ~, h)
-UpdateH_Callback(hO, h)
+UpdateH_Callback(hO, [], h)
 if strcmp(h.check_fmt_1.Checked,'on') % Stream
     h.St.String = 'Writing Audio stream...';
     outinds = round(h.m.vstart*size(h.H,2))+1:round(h.m.vend*size(h.H,2));
@@ -230,7 +231,7 @@ h.combineAV.Enable = 'on';
 guidata(hO,h)
 
 function ExportAVI_Callback(hO, ~, h)
-UpdateH_Callback(hO, h)
+UpdateH_Callback(hO, [], h)
 h.St.String = 'Writing AVI file...'; drawnow
 fn = h.filename.String; 
 sc = 256/h.m.clim(2);
@@ -303,6 +304,25 @@ h.check_fmt_2.Checked = 'off';
 h.check_fmt_3.Checked = 'on';
 guidata(hO,h)
 
+function PlayNotes_Callback(hO,~,h)
+if isfield(h.m,'keys')
+    h.St.String = 'Playing keys...'; drawnow
+    for i = 1:numel(h.m.keys)
+        tic
+        [note,ps] = notestr(h.m.keys(i)+1);
+        y = loadnote(note,ps,0);
+        if t < .5
+            pause(.5-toc)
+        end
+        sound(y,44100)
+    end
+    h.St.String = 'Done playing keys.';
+else
+end
+guidata(hO,h)
+
+    
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function doNothing_Callback(hO, ~, h)
@@ -321,3 +341,7 @@ function addoct_Callback(hO, ~, h)
 function addoct_CreateFcn(hO, ~, h)
 function ve_str_CreateFcn(hO, ~, h)
 function vs_str_CreateFcn(hO, ~, h)
+
+
+
+
