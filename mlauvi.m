@@ -11,11 +11,12 @@ if nargout; [varargout{1:nargout}] = gui_mainfcn(gui_State, varargin{:}); else; 
 
 function mlauvi_OpeningFcn(hO, ~, h, varargin)
 warning('off','all')
+% cd to active script location
+tmp = matlab.desktop.editor.getActive;
+h.mlauvipath = fileparts(tmp.Filename);
+cd(h.mlauvipath);
 % Addpath GUI folder
-if ~contains(path,{'mlauvi/utils','mlauvi/audio'})
-    waitfor(msgbox('Please choose the mlauvi folder.'));
-    addpath(genpath(uigetdir(cd,'Please navigate to the mlauvi directory.')));
-end
+addpath(genpath(h.mlauvipath));
 
 % set ffmpeg path (for combining V/A)
 try
@@ -37,7 +38,7 @@ guidata(hO, h);
 function varargout = mlauvi_OutputFcn(hO, ~, h)
 varargout{1} = h.output;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%% MAIN CALLBACKS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function LoadData_Callback(hO, ~, h)
 [File,Path] = uigetfile('.mat','Please choose a data file that contains H');
@@ -105,14 +106,17 @@ guidata(hO, h);
 
 function thresh_Callback(hO, ~, h)
 h.m.thresh = str2num(h.thresh.String);
-UpdateH_Callback(hO, [], h)
+h.UpdateH.BackgroundColor = [1 0 0];
 guidata(hO, h);
 
 function frameslider_Callback(hO, ~, h)
 h.framenum = round(h.frameslider.Value*size(h.H,2));
+if h.framenum == 0;
+    h.framenum = 1;
+end
 h.frametxt.String = [mat2str(round(h.framenum*100/h.m.framerate)/100) ' sec'];
 UpdatePlots(h)
-UpdateH_Callback(hO, [], h)
+%UpdateH_Callback(hO, [], h)
 guidata(hO, h);
 
 function PlayVid_Callback(hO, ~, h)
@@ -147,11 +151,12 @@ outinds = round(h.m.vstart*size(h.H,2))+1:round(h.m.vend*size(h.H,2));
 tmp = zeros(1,size(h.H,1)); tmp(h.m.Wshow) = 1;
 
 h.St.String = 'Updating H''...'; drawnow
-[h.m.keys,keyrangegood] = makekeys(h.scale.Value,h.scaletype.Value,numel(find(h.m.W_sf & tmp)),str2num(h.addoct.String));
-if ~keyrangegood
-    h.St.String = 'ERROR: The number of components and note arrangement you have chosen is too broad. Please try using less components or a tighter note arrangement (e.g. scale)';
-    return
-end
+h.m.keys = makekeys(h.scale.Value,h.scaletype.Value,numel(find(h.m.W_sf & tmp)),str2num(h.addoct.String));
+%[h.m.keys,h.keyrangegood] = makekeys(h.scale.Value,h.scaletype.Value,numel(find(h.m.W_sf & tmp)),str2num(h.addoct.String));
+% if ~h.keyrangegood
+%     h.St.String = 'ERROR: The number of components and note arrangement you have chosen is too broad. Please try using less components or a tighter note arrangement (e.g. scale)';
+%     return
+% end
 
 [h.Mfinal,h.nd] = H_to_nd(h.H(find(h.m.W_sf & tmp),outinds),h.m.framerate,h.m.thresh,h.m.keys);
 h.M.notestart = h.Mfinal(:,5);
@@ -160,6 +165,7 @@ h.M.notemag = h.Mfinal(:,4);
 h.M.notekey = h.Mfinal(:,3);
 
 UpdatePlots(h)
+h.UpdateH.BackgroundColor = [1 1 1];
 h.St.String = 'H'' updated.';
 guidata(hO, h);
 
@@ -176,7 +182,7 @@ h.UpdateH.BackgroundColor = [1 0 0];
 guidata(hO, h);
 
 function editcmap_Callback(hO, ~, h)
-editcmap(hO,h);  
+editcmap(hO,h); 
 guidata(hO,h);
 
 function slider_Callback(hO, ~)
@@ -186,18 +192,19 @@ h.m.vend = round(1000*(h.slider.Children(2).Position(1)-.1875)/.625)/1000;
 h.vs_str.String = mat2str(h.m.vstart*100);
 h.ve_str.String = mat2str(h.m.vend*100);
 drawnow
+h.UpdateH.BackgroundColor = [1 0 0];
 guidata(hO,h);
 
 function vs_str_Callback(hO, ~, h)
 h.m.vstart = str2num(h.vs_str.String)/100;
 h.slider.Children(1).Position(1) = h.m.vstart * .625;
-UpdateH_Callback(hO, [], h)
+h.UpdateH.BackgroundColor = [1 0 0];
 guidata(hO,h);
 
 function ve_str_Callback(hO, ~, h)
 h.m.vend = str2num(h.ve_str.String)/100;
 h.slider.Children(2).Position(1) = h.m.vend * .625 + .1875;
-UpdateH_Callback(hO, [], h)
+h.UpdateH.BackgroundColor = [1 0 0];
 guidata(hO,h);
 
 function ExportAudio_Callback(hO, ~, h)
@@ -206,7 +213,7 @@ if strcmp(h.check_fmt_1.Checked,'on') % Stream
     h.St.String = 'Writing Audio stream...';
     outinds = round(h.m.vstart*size(h.H,2))+1:round(h.m.vend*size(h.H,2));
     tmp = zeros(1,size(h.H,1)); tmp(h.m.Wshow) = 1;
-    out = NeuralStream(h.H(h.m.W_sf & tmp,outinds),h.m,h.m.keys,h.filename.String);
+    out = NeuralStream(h.H(h.m.W_sf & tmp,outinds),h.m,h.m.keys,fullfile(h.mlauvipath,'output',h.filename.String));
     if ~out
         h.St.String = 'ERROR: The number of components and note arrangement you have chosen is too broad. Please try using less components or a tighter note arrangement (e.g. scale)';
         return
@@ -216,15 +223,17 @@ if strcmp(h.check_fmt_1.Checked,'on') % Stream
 elseif strcmp(h.check_fmt_2.Checked,'on')
     h.St.String = 'Writing Dynamic Audio file...';
     if ~isempty(h.nd)
-        nd_to_wav(h.filename.String,h.nd,h);
+        nd_to_wav(fullfile(h.mlauvipath,'output',h.filename.String),h.nd,h);
     end
     h.St.String = 'Dynamic Audio file written.'; drawnow
     
 elseif strcmp(h.check_fmt_3.Checked,'on')
     h.St.String = 'Writing MIDI...';
     midiout = matrix2midi_nic(h.Mfinal,300,[4,2,24,8],0);
-    writemidi(midiout, h.filename.String);
+    writemidi(midiout, fullfile(h.mlauvipath,'output',h.filename.String));
     h.St.String = 'MIDI file written'; drawnow
+else
+    h.St.String = 'Please select an audio format in the 
 end
 
 h.combineAV.Enable = 'on';
@@ -237,7 +246,7 @@ fn = h.filename.String;
 sc = 256/h.m.clim(2);
 Wtmp = h.W(:,h.m.Wshow); Htmp = h.H(h.m.Wshow,:);
 cmaptmp = h.cmap(h.m.Wshow,:);
-vidObj = VideoWriter([fn '.avi']);
+vidObj = VideoWriter(fullfile(h.mlauvipath,'output',[fn '.avi']));
 vidObj.FrameRate = h.m.framerate; open(vidObj)
 outinds = round(h.m.vstart*size(h.H,2))+1:round(h.m.vend*size(h.H,2));
 for i = outinds
@@ -256,7 +265,7 @@ h.St.String = 'AVI file written';
 close(vidObj);
 
 function combineAV_Callback(hO, ~, h)
-fn = h.filename.String; 
+fn = fullfile(h.mlauvipath,'output',h.filename.String); 
 
 system(['ffmpeg -loglevel panic -i ' fn '.avi -i ' fn '.wav -codec copy -shortest ' fn '_audio.avi -y']);
 if exist([fn '_audio.avi'])
@@ -283,8 +292,7 @@ else
     targ.Enable = 'on';
 end
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%% DROP DOWN CALLBACKS %%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function check_fmt_1_Callback(hO, ~, h)
 h.check_fmt_1.Checked = 'on';
@@ -311,9 +319,9 @@ if isfield(h.m,'keys')
         tic
         [note,ps] = notestr(h.m.keys(i)+1);
         y = loadnote(note,ps,0);
-        if t < .5
+        %if t < .5
             pause(.5-toc)
-        end
+        %end
         sound(y,44100)
     end
     h.St.String = 'Done playing keys.';
@@ -321,9 +329,7 @@ else
 end
 guidata(hO,h)
 
-    
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%% UNUSED CALLBACKS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function doNothing_Callback(hO, ~, h)
 function framerate_CreateFcn(hO, ~, h)
@@ -341,7 +347,3 @@ function addoct_Callback(hO, ~, h)
 function addoct_CreateFcn(hO, ~, h)
 function ve_str_CreateFcn(hO, ~, h)
 function vs_str_CreateFcn(hO, ~, h)
-
-
-
-
