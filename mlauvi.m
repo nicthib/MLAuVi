@@ -41,35 +41,26 @@ varargout{1} = h.output;
 %%%%%%%%%%%%%%%%%%%%%%%%%% MAIN CALLBACKS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function LoadData_Callback(hO, ~, h)
-[File,Path] = uigetfile('.mat','Please choose a data file that contains H');
+[File,Path] = uigetfile('.mat','Please choose a data file');
 matObj = matfile(fullfile(Path, File));
 matvars = whos(matObj);
-answer = questdlg('Would you like to load H?');
-if answer == 'Yes'
-    for i = 1:numel({matvars.name})
-        varstr{i} = ['Name = ' matvars(i).name ', size = ' mat2str(matvars(i).size)];
-    end
-    varH = listdlg('ListString',varstr,'Name','Choose H');
-    h.H = matObj.(matvars(varH).name);
-    h.cmap = jet(size(h.H,1));
-end
 
-answer = questdlg('Would you like to load W?');
-if answer == 'Yes'
-    for i = 1:numel({matvars.name})
-        varstr{i} = ['Name = ' matvars(i).name ', size = ' mat2str(matvars(i).size)];
-    end
-    varW = listdlg('ListString',varstr,'Name','Choose H');
-    h.W = matObj.(matvars(varW).name);
-    h.m.Wshow = 1:size(h.H,1);
-    h.m.W_sf = ones(1,size(h.W,3));
-    h.m.ss = size(h.W);
-    h.W = reshape(h.W,[prod(h.m.ss(1:2)) h.m.ss(3)]);
-    h.W_sf.Checked = 'off';
-    h.frameslider.Enable = 'on';
+for i = 1:numel({matvars.name})
+    varstr{i} = ['Name = ' matvars(i).name ', size = ' mat2str(matvars(i).size)];
 end
+varH = listdlg('ListString',varstr,'Name','Choose Temporal Variable','ListSize',[300 100]);
+varW = listdlg('ListString',varstr,'Name','Choose Spatial Variable','ListSize',[300 100]);
 
-h.m.clim = str2num(h.clim.String);
+h.H = matObj.(matvars(varH).name);
+h.W = matObj.(matvars(varW).name);
+
+h.cmap = jet(size(h.H,1));
+h.m.Wshow = 1:size(h.H,1);
+h.m.W_sf = ones(1,size(h.W,3));
+h.m.ss = size(h.W);
+h.W = reshape(h.W,[prod(h.m.ss(1:2)) h.m.ss(3)]);
+h.W_sf.Checked = 'off';
+h.frameslider.Enable = 'on';
 h.m.vstart = 0;
 h.m.vend = 1;
 h.m.framerate = str2num(h.framerate.String);
@@ -100,7 +91,6 @@ h.m.framerate = str2num(h.framerate.String);
 guidata(hO, h);
 
 function clim_Callback(hO, ~, h)
-h.m.clim = str2num(h.clim.String);
 UpdatePlots(h)
 guidata(hO, h);
 
@@ -123,10 +113,10 @@ function PlayVid_Callback(hO, ~, h)
 while h.PlayVid.Value
     axes(h.axesWH);
     h.frameslider.Enable = 'off';
-    sc = 256/h.m.clim(2);
-    im = reshape(h.W(:,h.m.Wshow)*diag(h.H(h.m.Wshow,h.framenum).*h.m.W_sf(h.m.Wshow)'-h.m.clim(1))*h.cmap(h.m.Wshow,:),[h.m.ss(1:2) 3]);
+    sc = 256/(mat2str(h.clim.String));
+    im = reshape(h.W(:,h.m.Wshow)*diag(h.H(h.m.Wshow,h.framenum).*h.m.W_sf(h.m.Wshow)')*h.cmap(h.m.Wshow,:),[h.m.ss(1:2) 3]);
     imagesc(uint8(sc*im))
-    caxis(h.m.clim)
+    caxis([0 str2num(h.clim.String)])
     axis equal
     axis off
     pause(.01)
@@ -232,25 +222,24 @@ elseif strcmp(h.check_fmt_3.Checked,'on')
     midiout = matrix2midi_nic(h.Mfinal,300,[4,2,24,8],0);
     writemidi(midiout, fullfile(h.mlauvipath,'output',h.filename.String));
     h.St.String = 'MIDI file written'; drawnow
+    h.combineAV.Enable = 'on';
 else
-    h.St.String = 'Please select an audio format in the 
+    h.St.String = 'Please select an audio format in the edit menu drop down';
 end
-
-h.combineAV.Enable = 'on';
 guidata(hO,h)
 
 function ExportAVI_Callback(hO, ~, h)
 UpdateH_Callback(hO, [], h)
 h.St.String = 'Writing AVI file...'; drawnow
 fn = h.filename.String; 
-sc = 256/h.m.clim(2);
+sc = 256/str2num(h.clim.String);
 Wtmp = h.W(:,h.m.Wshow); Htmp = h.H(h.m.Wshow,:);
 cmaptmp = h.cmap(h.m.Wshow,:);
 vidObj = VideoWriter(fullfile(h.mlauvipath,'output',[fn '.avi']));
 vidObj.FrameRate = h.m.framerate; open(vidObj)
 outinds = round(h.m.vstart*size(h.H,2))+1:round(h.m.vend*size(h.H,2));
 for i = outinds
-    im = reshape(Wtmp*diag(Htmp(:,i).*h.m.W_sf(h.m.Wshow)'-h.m.clim(1))*cmaptmp,[h.m.ss(1:2) 3]);
+    im = reshape(Wtmp*diag(Htmp(:,i).*h.m.W_sf(h.m.Wshow)')*cmaptmp,[h.m.ss(1:2) 3]);
     im = uint8(im*sc);
     frame.cdata = im;
     frame.colormap = [];

@@ -25,10 +25,10 @@ axis equal
 axis off
 
 axes(h.axesWH); cla
-sc = 256/h.m.clim(2);
-im = reshape(h.W(:,h.m.Wshow)*diag(h.H(h.m.Wshow,h.framenum)-h.m.clim(1))*h.cmap(h.m.Wshow,:),[h.m.ss(1:2) 3]);
+sc = 256/str2num(h.clim.String);
+im = reshape(h.W(:,h.m.Wshow)*diag(h.H(h.m.Wshow,h.framenum))*h.cmap(h.m.Wshow,:),[h.m.ss(1:2) 3]);
 imagesc(uint8(im*sc))
-caxis(h.m.clim)
+caxis([0 str2num(h.clim.String)])
 axis equal
 axis off
 drawnow
