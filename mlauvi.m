@@ -101,7 +101,7 @@ guidata(hO, h);
 
 function frameslider_Callback(hO, ~, h)
 h.framenum = round(h.frameslider.Value*size(h.H,2));
-if h.framenum == 0;
+if h.framenum == 0
     h.framenum = 1;
 end
 h.frametxt.String = [mat2str(round(h.framenum*100/h.m.framerate)/100) ' sec'];
@@ -113,7 +113,7 @@ function PlayVid_Callback(hO, ~, h)
 while h.PlayVid.Value
     axes(h.axesWH);
     h.frameslider.Enable = 'off';
-    sc = 256/(mat2str(h.clim.String));
+    sc = 256/(str2num(h.clim.String));
     im = reshape(h.W(:,h.m.Wshow)*diag(h.H(h.m.Wshow,h.framenum).*h.m.W_sf(h.m.Wshow)')*h.cmap(h.m.Wshow,:),[h.m.ss(1:2) 3]);
     imagesc(uint8(sc*im))
     caxis([0 str2num(h.clim.String)])
@@ -306,11 +306,18 @@ if isfield(h.m,'keys')
     h.St.String = 'Playing keys...'; drawnow
     for i = 1:numel(h.m.keys)
         tic
-        [note,ps] = notestr(h.m.keys(i)+1);
-        y = loadnote(note,ps,0);
-        %if t < .5
-            pause(.5-toc)
-        %end
+        if strcmp(h.check_fmt_1.Checked,'on') % Stream
+            freq = 16.35*2.^(h.m.keys(i)/12);
+            if ~exist('t')
+                t = 0:(1/16384):.5;
+                g = [linspace(0,1,2000) ones(1,8193-4000) linspace(1,0,2000)];
+            end
+            y = g.*sin(2*pi*freq*t);
+        else
+            [note,ps] = notestr(h.m.keys(i)+1);
+            y = loadnote(note,ps,0);
+        end
+        pause(.5-toc)
         sound(y,44100)
     end
     h.St.String = 'Done playing keys.';

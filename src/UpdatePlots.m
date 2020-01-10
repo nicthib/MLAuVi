@@ -6,16 +6,19 @@ Hstd = std(h.H(:));
 outinds = round(h.m.vstart*size(h.H,2))+1:round(h.m.vend*size(h.H,2));
 t = 1/h.m.framerate:1/h.m.framerate:size(h.H,2)/h.m.framerate;
 l_idx = 0;
+a = 1;
 for i = Wim
     plot(t(outinds),h.H(i,outinds)+l_idx*Hstd*3,'Color',h.cmap(i,:))
-    text(-2,l_idx*Hstd*3,mat2str(i));
     l_idx = l_idx+1;
     hold on
+    a = a+1;
 end
 colormap(h.cmap); caxis([0 size(h.cmap,1)]); %colorbar('EastOutside')
 xlabel('time (sec)');
-xlim([-3 t(outinds(end))])
-set(gca,'YTick',[])
+xlim([0 t(outinds(end))])
+ylim([-Hstd*3 (l_idx+1)*Hstd*3])
+set(gca,'YTick',[5:5:max(Wim)]*Hstd*3)
+set(gca,'YTickLabel',5:5:max(Wim))
 
 axes(h.axesW); cla
 Wtmp = reshape(h.W(:,h.m.Wshow).*h.m.W_sf(h.m.Wshow)*h.cmap(h.m.Wshow,:),[h.m.ss(1:2) 3]);
@@ -30,7 +33,7 @@ im = reshape(h.W(:,h.m.Wshow)*diag(h.H(h.m.Wshow,h.framenum))*h.cmap(h.m.Wshow,:
 imagesc(uint8(im*sc))
 caxis([0 str2num(h.clim.String)])
 axis equal
-axis off
+axis on
 drawnow
 
 if isfield(h,'Mfinal')
