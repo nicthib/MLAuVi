@@ -33,7 +33,7 @@ im = reshape(h.W(:,h.m.Wshow)*diag(h.H(h.m.Wshow,h.framenum))*h.cmap(h.m.Wshow,:
 imagesc(uint8(im*sc))
 caxis([0 str2num(h.clim.String)])
 axis equal
-axis on
+axis off
 drawnow
 
 if isfield(h,'Mfinal')
